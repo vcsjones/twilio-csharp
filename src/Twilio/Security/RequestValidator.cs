@@ -11,8 +11,7 @@ namespace Twilio.Security
     /// </summary>
     public class RequestValidator
     {
-        private readonly HMACSHA1 _hmac;
-        private readonly SHA256 _sha;
+        private readonly byte[] _hmacSecret;
 
         /// <summary>
         /// Create a new RequestValidator
@@ -20,8 +19,7 @@ namespace Twilio.Security
         /// <param name="secret">Signing secret</param>
         public RequestValidator(string secret)
         {
-            _hmac = new HMACSHA1(Encoding.UTF8.GetBytes(secret));
-            _sha = SHA256.Create();
+            _hmacSecret = Encoding.UTF8.GetBytes(secret);
         }
 
         /// <summary>
@@ -70,8 +68,11 @@ namespace Twilio.Security
 
         public bool ValidateBody(string rawBody, string expected)
         {
-            var signature = _sha.ComputeHash(Encoding.UTF8.GetBytes(rawBody));
-            return SecureCompare(BitConverter.ToString(signature).Replace("-","").ToLower(), expected);
+            using (SHA256 sha = SHA256.Create())
+            {
+                var signature = sha.ComputeHash(Encoding.UTF8.GetBytes(rawBody));
+                return SecureCompare(BitConverter.ToString(signature).Replace("-","").ToLower(), expected);
+            }
         }
 
         private static IDictionary<string, string> ToDictionary(NameValueCollection col)
@@ -98,8 +99,11 @@ namespace Twilio.Security
                 }
             }
 
-            var hash = _hmac.ComputeHash(Encoding.UTF8.GetBytes(b.ToString()));
-            return Convert.ToBase64String(hash);
+            using (HMACSHA1 hmac = new HMACSHA1(_hmacSecret))
+            {
+                var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(b.ToString()));
+                return Convert.ToBase64String(hash);
+            }
         }
 
         private static bool SecureCompare(string a, string b)
